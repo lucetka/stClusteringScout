@@ -517,8 +517,8 @@ def main():
                                                      title = f'n_neighbors {vizmodel}')                                #color = [str(int(i)) for i in results[vizmodel][mcs][0]]
                         
                             st.plotly_chart(curr_fig, use_container_width=True)
-                            curr_fig.write_html(f"fig_{str(i)}.html")
-                            curr_fig.show('browser')
+                            #curr_fig.write_html(f"fig_{str(i)}.html")
+                            #curr_fig.show('browser')
                             i=i+1
                     
               
