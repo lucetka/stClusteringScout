@@ -465,8 +465,8 @@ def main():
 
             
             
-                    hyperparameters_plot.write_html(f"{number_dimensions}D_{umap_metric}_md{min_dist}_min_samples{min_samples}_{cluster_selection_method}.html")
-                    hyperparameters_plot.show('browser')
+                    #hyperparameters_plot.write_html(f"{number_dimensions}D_{umap_metric}_md{min_dist}_min_samples{min_samples}_{cluster_selection_method}.html")
+                    #hyperparameters_plot.show('browser')
 
 
     #### Happy
