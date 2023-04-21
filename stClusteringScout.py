@@ -179,7 +179,8 @@ def main():
                     
     st.title("Compare clusterings with multiple UMAP and HDBSCAN models")
     st.sidebar.title("CLUSTERING SCOUT")
-
+    
+    "I AM CURRENTLY EXPERIMENTING HERE. SO DO NOT BE SURPRISED IF IT DOES NOT WORK. USE AT YOUR OWN RISK."
     "This app will help you choose parameters for dimension reduction and clustering based on your requirements for granularity and clustering completeness (i.e. you can input a threshold for maximum and minimum number of clusters and a threshold for maximum % of unclustered points). These thresholds will not influence getting the clustering results - they only influence the recommendations presented. This current version is very basic and does not provide any cluster diagnostics."
 
     st.markdown("First, please your load your data.")
