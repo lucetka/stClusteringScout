@@ -402,7 +402,7 @@ def main():
                 #####end  added after demo####
             
                     results_incl_eps = {nn:cluster_with_all_models_incl_eps(dimred[nn], st.session_state.configurations[0]) for nn in range(st.session_state.n_neighbors_min[0] , st.session_state.n_neighbors_max[0] + st.session_state.n_neighbors_step[0], st.session_state.n_neighbors_step[0] )}
-                    #st.write(results_incl_eps)
+                    st.write(results_incl_eps)
 
                     results = results_incl_eps
 
