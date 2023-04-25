@@ -553,11 +553,12 @@ def main():
                     with tab5:  
                         st.subheader('Connectivity plots')
                         if plot_connectivity == 'Yes':
-                            st.write(results)
-                            st.write(data.head(2))
+                            #st.write(results)
+                            #st.write(data.head(2))
                             plt.figure(figsize=(7,5))
                             diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
                                                          metric = umap_metric, random_state=random_state).fit(data)
+                            st.write(diagnostic_results_min_nn)
                     
                             umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis", width = 1800, edge_bundling='hammer')
 
@@ -585,7 +586,7 @@ def main():
                 else:
                     st.write(f'Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
             except:
-                    st.write(f'Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
+                    st.write(f'(Try-Except)Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
 
 if __name__ == '__main__':
     main()
