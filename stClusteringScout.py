@@ -4,7 +4,8 @@
 ## starting from stOPTICRAP (which had started from stHAPPYCRAPPER, a descendant of stMULTICRAPPER, which in turn had started from simple CRAP)
 
 ### to do:
-
+### - eps range selection
+###- 
 ### - 1. split summary plot and recommendations
 ### - do something about the printed dict
 ### - tooltips and description
@@ -65,13 +66,7 @@ def main():
             data = None
             st.write ("Your dataset has missing values and thus can't be used. Please fix it first (for example, you may want to fill the missing values with 0).")
             
-        #this is demo only
-        #data = pd.read_csv('.\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_input4specter_embeddings.T_with_title.csv', index_col=0)
-
-        #data = pd.read_csv(r'C:\Users\lkalvodova\OneDrive - Wiley\DESKTOP\WORK\DATA_SCIENCE\Codespaces_bak\omics_2016-Jul2022_Qlik+ISI\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_input4specter_embeddings.T_with_title.csv', index_col=0)
-        #data = pd.read_csv(r'C:\Users\lkalvodova\OneDrive - Wiley\DESKTOP\WORK\DATA_SCIENCE\PYTHON\Neurochemistry\neurochemistry_comp2019-2023_19Jan23_input4specter_embeddings.T_with_title.csv', index_col=0)
-                #C:\Users\lkalvodova\OneDrive - Wiley\DESKTOP\WORK\DATA_SCIENCE\Codespaces_bak\omics_2016-Jul2022_Qlik+ISI\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_index_reference.csv
-                #covariates = pd.read_csv('.\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_index_reference.csv')
+        
         return data  #, covariates
 
     #@st.cache(persist=True)
@@ -553,8 +548,17 @@ def main():
                              size = 'n_clusters', size_max = 50, animation_frame='(UMAP) n_neighbors', height=1000, color = 'eps', color_continuous_scale='Turbo', range_y = [-5,1.05*(df['percent_unclustered'].max())])
                         st.plotly_chart(unclustered_vs_mcs, use_container_width=True) 
 
-               
-                    with tab5:  
+                    with tab5:
+                        st.header("UMAP and HDBSCAN models in use & results")
+                        #st.write(results)
+                        st.write("UMAP models:")
+                        st.write(st.session_state.umap_models[0])
+                        st.write("HDBSCAN models:")
+                        st.write(st.session_state.configurations[0])
+                        st.write("Results for all configurations:")
+                        st.write(results_incl_eps)
+                        
+                    with tab6:  
                         st.subheader('Connectivity plots')
                         if plot_connectivity == 'Yes':
                             plt.figure(figsize=(7,5))
@@ -567,21 +571,9 @@ def main():
                         else:
                             st.write('You did not choose a connectivity plot to be made.')
                     
-                    with tab6:
-                        st.header("UMAP and HDBSCAN models in use & results")
-                        #st.write(results)
-                        st.write("UMAP models:")
-                        st.write(st.session_state.umap_models[0])
-                        st.write("HDBSCAN models:")
-                        st.write(st.session_state.configurations[0])
-                        st.write("Results for all configurations:")
-                        st.write(results_incl_eps)
+                    
 
-                      #for mcs in range(st.session_state.min_cluster_size_min[0],st.session_state.min_cluster_size_max[0] + st.session_state.cluster_step[0], st.session_state.cluster_step[0]):
-                        #i=1
-                                  
-                        #curr_fig =  px.scatter(data, x = vizred[vizmodel][:, 0], y = vizred[vizmodel][:, 1], hover_data={data.index.name: (data.index)}, color = [str(int(i)) for i in results[vizmodel][mcs][0]], title = f'n_neighbors {vizmodel}, minimal_cluster_size {mcs}, cluster_lection_epsilon 0, min_samples = {min_samples}, cluster_selection_method = {cluster_selection_method}, clustering in {number_dimensions}D')
-                        
+                     
                 #### end added after demo
 
                 #histogram_plot = px.histogram(results[6][16][0.15])     # no I don't want this, this shows how many points are in clusters -1 + 0, 2 + 3, etc; 
