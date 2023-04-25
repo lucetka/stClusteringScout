@@ -548,19 +548,13 @@ def main():
                              size = 'n_clusters', size_max = 50, animation_frame='(UMAP) n_neighbors', height=1000, color = 'eps', color_continuous_scale='Turbo', range_y = [-5,1.05*(df['percent_unclustered'].max())])
                         st.plotly_chart(unclustered_vs_mcs, use_container_width=True) 
 
-                    with tab5:
-                        st.header("UMAP and HDBSCAN models in use & results")
-                        #st.write(results)
-                        st.write("UMAP models:")
-                        st.write(st.session_state.umap_models[0])
-                        st.write("HDBSCAN models:")
-                        st.write(st.session_state.configurations[0])
-                        st.write("Results for all configurations:")
-                        st.write(results_incl_eps)
+                    
                         
-                    with tab6:  
+                    with tab5:  
                         st.subheader('Connectivity plots')
                         if plot_connectivity == 'Yes':
+                            st.write(results)
+                            st.write(data.head(2))
                             plt.figure(figsize=(7,5))
                             diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
                                                          metric = umap_metric, random_state=random_state).fit(data)
@@ -571,7 +565,15 @@ def main():
                         else:
                             st.write('You did not choose a connectivity plot to be made.')
                     
-                    
+                    with tab6:
+                        st.header("UMAP and HDBSCAN models in use & results")
+                        #st.write(results)
+                        st.write("UMAP models:")
+                        st.write(st.session_state.umap_models[0])
+                        st.write("HDBSCAN models:")
+                        st.write(st.session_state.configurations[0])
+                        st.write("Results for all configurations:")
+                        st.write(results_incl_eps)
 
                      
                 #### end added after demo
