@@ -561,7 +561,7 @@ def main():
                             st.write(diagnostic_results_min_nn)
                     
                             umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis", width = 1800, edge_bundling='hammer')
-
+                            st.write(" umap.plot.connectivity done")
                             st.pyplot(plt)
                         else:
                             st.write('You did not choose a connectivity plot to be made.')
