@@ -560,7 +560,7 @@ def main():
                             tmpplot = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, metric = umap_metric, random_state=random_state).fit(data)
                             umap.plot.diagnostic(tmpplot, diagnostic_type='pca')
                             #diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
-                                                         metric = umap_metric, random_state=random_state).fit(data)
+                                                      #   metric = umap_metric, random_state=random_state).fit(data)
                             #st.write(diagnostic_results_min_nn)
                             #st.write(diagnostic_results_min_nn)
                     
