@@ -556,12 +556,16 @@ def main():
                             #st.write(results)
                             #st.write(data.head(2))
                             plt.figure(figsize=(7,5))
-                            diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
+                            
+                            tmpplot = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, metric = umap_metric, random_state=random_state).fit(data)
+                            umap.plot.diagnostic(tmpplot, diagnostic_type='pca')
+                            #diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
                                                          metric = umap_metric, random_state=random_state).fit(data)
-                            st.write(diagnostic_results_min_nn)
+                            #st.write(diagnostic_results_min_nn)
+                            #st.write(diagnostic_results_min_nn)
                     
-                            umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis",  edge_bundling='hammer')   #width = 1800,
-                            st.write(" umap.plot.connectivity done")
+                            #umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis",  edge_bundling='hammer')   #width = 1800,
+                            #st.write(" umap.plot.connectivity done")
                             st.pyplot(plt)
                         else:
                             st.write('You did not choose a connectivity plot to be made.')
