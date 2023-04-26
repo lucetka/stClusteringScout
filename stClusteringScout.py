@@ -560,7 +560,7 @@ def main():
                                                          metric = umap_metric, random_state=random_state).fit(data)
                             st.write(diagnostic_results_min_nn)
                     
-                            umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis", width = 1800, edge_bundling='hammer')
+                            umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis",  edge_bundling='hammer')   #width = 1800,
                             st.write(" umap.plot.connectivity done")
                             st.pyplot(plt)
                         else:
