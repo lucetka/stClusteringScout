@@ -17,30 +17,19 @@
 
 ### *** i should alos put number_dimensions to session state but then I have to change it when using it later to st.session....
 
-# if number_dimensions = "No dimensionality reduction" .... then what?
+# if number_dimensions = "No dimensionality reduction" .... then what? - forgot to take care of this
 
 
 import streamlit as st
-
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
-
 import pandas as pd
-#from bertopic import BERTopic
-#from sklearn.feature_extraction.text import CountVectorizer
 import umap
-
 import umap.plot
-
-
 import numpy as np
 import plotly.express as px
 from hdbscan import HDBSCAN
 import colorcet as cc
-
-#from io import StringIO, BytesIO
-#import io
-
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -91,10 +80,7 @@ def main():
         dimred_results = dimred_model.fit_transform(data)
         return dimred_results
 
-    #def cluster_data(data, algorithm, args, kwds):
-    #    hdbscan_model = algorithm(*args, **kwds)  #.fit_transform(data)
-    #    clustered = hdbscan_model.fit_predict(data)
-    #    return clustered
+   
 
     def cluster_data(data, algorithm, args, kwds):                                          # I really need to rewrite it to cache the no-eps result
        print (kwds)
