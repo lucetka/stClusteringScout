@@ -332,7 +332,7 @@ def main():
                         cluster_selection_epsilon=eps,
                         gen_min_span_tree=True,
                         memory=r'./tmp_hdbscan_cache/',
-                        prediction_data=True) for eps in np.linspace(0,maxeps+epsstep,maxeps/epsstep)}
+                        prediction_data=True) for eps in np.linspace(0,maxeps+epsstep,int(maxeps/epsstep))}
 
             
             #configurations.append({'n_neighbors':n_neighbors, 'n_components':number_dimensions, 'metric':umap_metric, 'min_dist':min_dist, 'random_state':random_state})   
