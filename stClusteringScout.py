@@ -325,7 +325,7 @@ def main():
 
             st.write('HDBSCAN models:')
             
-            for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
+            for i in np.arange(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
                 configurations[i] = {eps: HDBSCAN(min_cluster_size = i,
                         min_samples = min_samples,
                         cluster_selection_method =cluster_selection_method,
