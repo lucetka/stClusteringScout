@@ -1,10 +1,11 @@
 ### Thank you for studying my code. You will not learn anything new here.
+### --Lucie
 
 ### This is my learning project. I am experimenting here. It's my 2nd Streamlit app and my first deployed app.
 ### This is also the first time I am using GitHub to do more than just as a manual backup. 
 
 
-## starting from stOPTICRAP (which had started from stHAPPYCRAPPER, a descendant of stMULTICRAPPER, which in turn had started from simple CRAP)
+##  Starting from stOPTICRAP (which had started from stHAPPYCRAPPER, a descendant of stMULTICRAPPER, which in turn had started from simple CRAP)
 
 ### to do:
 ### - eps range selection
@@ -37,8 +38,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Set np random state
-random_state = np.random.RandomState(42)              ###   CHANGE THIS IN THE FINAL VERSION, FOR NOW I'M LEAVING IT HERE BECAUSE I'M LAZY
-np.random.RandomState(42)
+#random_state = np.random.RandomState(42)              ###   CHANGE THIS IN THE FINAL VERSION, FOR NOW I'M LEAVING IT HERE BECAUSE I'M LAZY
+#np.random.RandomState(42)
 
 
 def main():
@@ -164,7 +165,7 @@ def main():
     st.title("Compare clusterings with multiple UMAP and HDBSCAN models")
     st.sidebar.title("CLUSTERING SCOUT")
     
-    "I AM CURRENTLY EXPERIMENTING HERE. SO DO NOT BE SURPRISED IF IT DOES NOT WORK. USE AT YOUR OWN RISK."
+    "I AM CURRENTLY EXPERIMENTING HERE. SO DO NOT BE SURPRISED IF SOMETHING DOES NOT WORK. USE AT YOUR OWN RISK."
     "This app will help you choose parameters for dimension reduction and clustering based on your requirements for granularity and clustering completeness (i.e. you can input a threshold for maximum and minimum number of clusters and a threshold for maximum % of unclustered points). These thresholds will not influence getting the clustering results - they only influence the recommendations presented. This current version is very basic and does not provide any cluster diagnostics."
 
     st.markdown("First, please your load your data.")
@@ -267,11 +268,15 @@ def main():
 
         cluster_selection_method = st.sidebar.radio('Cluster selection method (currently single choice only):', ('eom', 'leaf'), key = 'cluster_selection_method')
         
-        #cluster_selection_epsilon = st.sidebar.number_input('Cluster selection epsilon:', min_value = 0.000, max_value = None,step = 0.001, value =0.000, format="%f" )
-        cluster_selection_epsilon = st.sidebar.slider('Select the range of epsilon values to test as their 100-fold values (e.g. select 15 to set the upper limit to 0.15):',
-                         0,  100, key='cluster_selection_epsilon')   # I have to work on determining the upper bound
+        cluster_selection_epsilon = st.sidebar.number_input('Maximum cluster selection epsilon:', min_value = 0.000, max_value = None, value =0.000, format="%f" )
+        eps_step = st.sidebar.number_input("Select the step for epsilon values: ", min_value =0.000, max_value = cluster_selection_epsilon, value = 0.000, format="%f", key='eps_step' )    
+        
+        #cluster_selection_epsilon = st.sidebar.slider('Select the range of epsilon values to test as their 100-fold values (e.g. select 15 to set the upper limit to 0.15):',
+        #                 0,  100, key='cluster_selection_epsilon')   # I have to work on determining the upper bound - this could be done easily using the tree
      
-        eps_step = st.sidebar.number_input("Select the step for epsilon values (no scaling - to select 0.03, select 0.03): ", min_value =0.000, max_value = cluster_selection_epsilon/100, step = 0.001, value = 0.030, format="%f", key='eps_step' )    
+        #eps_step = st.sidebar.number_input("Select the step for epsilon values (no scaling - to select 0.03, select 0.03): ", min_value =0.000, max_value = cluster_selection_epsilon/100, step = 0.001, value = 0.030, format="%f", key='eps_step' )
+
+
         
 
 ## happy
@@ -321,13 +326,13 @@ def main():
             st.write('HDBSCAN models:')
             
             for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
-                configurations[i] = {eps/100: HDBSCAN(min_cluster_size = i,
+                configurations[i] = {eps: HDBSCAN(min_cluster_size = i,
                         min_samples = min_samples,
                         cluster_selection_method =cluster_selection_method,
-                        cluster_selection_epsilon=eps/100,
+                        cluster_selection_epsilon=eps,
                         gen_min_span_tree=True,
                         memory=r'./tmp_hdbscan_cache/',
-                        prediction_data=True) for eps in range(0,maxeps+int(100*epsstep),int(100*(epsstep)))}
+                        prediction_data=True) for eps in range(0,maxeps+epsstep,epsstep)}
 
             
             #configurations.append({'n_neighbors':n_neighbors, 'n_components':number_dimensions, 'metric':umap_metric, 'min_dist':min_dist, 'random_state':random_state})   
