@@ -325,14 +325,14 @@ def main():
 
             st.write('HDBSCAN models:')
             
-            for i in np.arange(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
+            for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
                 configurations[i] = {eps: HDBSCAN(min_cluster_size = i,
                         min_samples = min_samples,
                         cluster_selection_method =cluster_selection_method,
                         cluster_selection_epsilon=eps,
                         gen_min_span_tree=True,
                         memory=r'./tmp_hdbscan_cache/',
-                        prediction_data=True) for eps in range(0,maxeps+epsstep,epsstep)}
+                        prediction_data=True) for eps in np.arange(0,maxeps+epsstep,epsstep)}
 
             
             #configurations.append({'n_neighbors':n_neighbors, 'n_components':number_dimensions, 'metric':umap_metric, 'min_dist':min_dist, 'random_state':random_state})   
