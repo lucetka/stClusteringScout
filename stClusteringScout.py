@@ -361,7 +361,7 @@ def main():
                     df = pd.concat(dataframes.values(), axis = 1)     # the resulting df has a multiindex consisting of mcs - eps nd the columns correspond to the different UMAP
                                                                 # models defined by nn values, but they will all be called  0
 
-                    df.to_csv('halleluja.csv')
+                    #df.to_csv('halleluja.csv')
                 #let's give the columns correct names
                     df.columns = [i for i in range(st.session_state.n_neighbors_min[0] , st.session_state.n_neighbors_max[0] + st.session_state.n_neighbors_step[0], st.session_state.n_neighbors_step[0] )]
 
@@ -376,7 +376,7 @@ def main():
                     df = df.rename(columns = {'level_0':'(UMAP) n_neighbors', 'level_1':'min_cluster_size', 'level_2':'eps'})   
 
 
-                    df.to_csv('hallelujaY.csv')
+                    #df.to_csv('hallelujaY.csv')
 
 
                     low_color = df['percent_unclustered'].min()
@@ -399,7 +399,7 @@ def main():
                      
             
                     hyperparameters_plot.write_html(f"{number_dimensions}D_{umap_metric}_md{min_dist}_min_samples{min_samples}_{cluster_selection_method}.html")
-                    hyperparameters_plot.show('browser')
+                    #hyperparameters_plot.show('browser')
 
 
 
@@ -451,7 +451,7 @@ def main():
                         
                             st.plotly_chart(curr_fig, use_container_width=True)
                             curr_fig.write_html(f"fig_{str(i)}.html")
-                            curr_fig.show('browser')
+                            #curr_fig.show('browser')
                             i=i+1
                     
               
