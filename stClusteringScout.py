@@ -1,15 +1,15 @@
 ### Thank you for studying my code. You will not learn anything new here.
 ### --Lucie
 
-### This is my learning project. I am experimenting here. It's my 2nd Streamlit app and my first deployed app.
+### This is my learning project. I am still experimenting here. It's my 2nd Streamlit app and my first deployed app.
 ### This is also the first time I am using GitHub to do more than just as a manual backup. 
 
 
-##  Starting from stOPTICRAP (which had started from stHAPPYCRAPPER, a descendant of stMULTICRAPPER, which in turn had started from simple CRAP)
+#### irrlevant chatter with myself:
+## starting from stOPTICRAP (which had started from stHAPPYCRAPPER, a descendant of stMULTICRAPPER, which in turn had started from simple CRAP)
 
 ### to do:
-### - eps range selection
-###- 
+
 ### - 1. split summary plot and recommendations
 ### - do something about the printed dict
 ### - tooltips and description
@@ -21,25 +21,31 @@
 
 ### *** i should alos put number_dimensions to session state but then I have to change it when using it later to st.session....
 
-# if number_dimensions = "No dimensionality reduction" .... then what? - forgot to take care of this
-
+# if number_dimensions = "No dimensionality reduction" .... then what?
+#######################
 
 import streamlit as st
+
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
+
 import pandas as pd
 import umap
+
 import umap.plot
+
+
 import numpy as np
 import plotly.express as px
 from hdbscan import HDBSCAN
 import colorcet as cc
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Set np random state
-#random_state = np.random.RandomState(42)              ###   CHANGE THIS IN THE FINAL VERSION, FOR NOW I'M LEAVING IT HERE BECAUSE I'M LAZY
-#np.random.RandomState(42)
+random_state = np.random.RandomState(42)              ###   CHANGE THIS IN THE FINAL VERSION, FOR NOW I'M LEAVING IT HERE BECAUSE I'M LAZY
+np.random.RandomState(42)
 
 
 def main():
@@ -59,7 +65,13 @@ def main():
             data = None
             st.write ("Your dataset has missing values and thus can't be used. Please fix it first (for example, you may want to fill the missing values with 0).")
             
-        
+        #this is demo only
+        #data = pd.read_csv('.\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_input4specter_embeddings.T_with_title.csv', index_col=0)
+
+        #data = pd.read_csv(r'C:\Users\lkalvodova\OneDrive - Wiley\DESKTOP\WORK\DATA_SCIENCE\Codespaces_bak\omics_2016-Jul2022_Qlik+ISI\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_input4specter_embeddings.T_with_title.csv', index_col=0)
+        #data = pd.read_csv(r'C:\Users\lkalvodova\OneDrive - Wiley\DESKTOP\WORK\DATA_SCIENCE\PYTHON\Neurochemistry\neurochemistry_comp2019-2023_19Jan23_input4specter_embeddings.T_with_title.csv', index_col=0)
+                #C:\Users\lkalvodova\OneDrive - Wiley\DESKTOP\WORK\DATA_SCIENCE\Codespaces_bak\omics_2016-Jul2022_Qlik+ISI\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_index_reference.csv
+                #covariates = pd.read_csv('.\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_index_reference.csv')
         return data  #, covariates
 
     #@st.cache(persist=True)
@@ -76,7 +88,6 @@ def main():
             clustered[i] = {} 
             for j in nested_dict[i].keys():   # j - the eps values
                 clustered[i][j] = nested_dict[i][j].fit_predict(data)
-        
         return clustered
 
     def reduce_dimensions(data, algorithm, args, kwds):
@@ -84,7 +95,10 @@ def main():
         dimred_results = dimred_model.fit_transform(data)
         return dimred_results
 
-   
+    #def cluster_data(data, algorithm, args, kwds):
+    #    hdbscan_model = algorithm(*args, **kwds)  #.fit_transform(data)
+    #    clustered = hdbscan_model.fit_predict(data)
+    #    return clustered
 
     def cluster_data(data, algorithm, args, kwds):                                          # I really need to rewrite it to cache the no-eps result
        print (kwds)
@@ -164,11 +178,10 @@ def main():
                     
     st.title("Compare clusterings with multiple UMAP and HDBSCAN models")
     st.sidebar.title("CLUSTERING SCOUT")
-    
-    "I AM CURRENTLY EXPERIMENTING HERE. SO DO NOT BE SURPRISED IF SOMETHING DOES NOT WORK. USE AT YOUR OWN RISK."
-    "This app will help you choose parameters for dimension reduction and clustering based on your requirements for granularity and clustering completeness (i.e. you can input a threshold for maximum and minimum number of clusters and a threshold for maximum % of unclustered points). These thresholds will not influence getting the clustering results - they only influence the recommendations presented. This current version is very basic and does not provide any cluster diagnostics."
 
-    st.markdown("First, please your load your data.")
+    "This app will help you choose parameters for dimension reduction and clustering based on your requirements for granularity and clustering completeness (i.e. you can input a threshold for maximum and minimum number of clusters and a threshold for maximum % of unclustered points). These thresholds will not influence getting the clustering results - they only influence the recommendations presented. This current version is very basic and does not provide any cluster diagnostics."
+    "In this version, cluster_selection_epsilon selection is limited to range 0...1 which is of course rather lame; if you need different values, you need to scale your data first. "
+    st.markdown("First, please load your data.")
 
     has_index_col = st.radio("Use the 1st column as index? (say 'Yes' if the 1st column is NOT a variable, i.e. if the 1st column is for e.g. a unique identifier such as the title of the article or if it is a row number)", ('Yes', 'No ( ALL columns will be considered features (variables)! ). If your 2D plot looks very odd, check this again.'), key="has_index_col")
     
@@ -242,15 +255,7 @@ def main():
        
         st.sidebar.subheader("HDBSCAN hyperparameters")
 
-        min_samples_help = 'Higher value means more points will be discarded as noise. While minimal cluster size determines the minimal size of a final cluster to be returned, \
-                            the min_samples parameter determines which points will be assigned to a cluster and which will be discarded as noise. Having large min_cluster_size \
-                            but small min_samples value will minimze the number of points discarded as noise and may in the end effect lead to less homogenous \
-                            clusters resulting from condensing smaller neighboring clusters together to yield superclusters with the specified minimal size. In other words, \
-                            the min_samples parameter determines how conservative your clustering will be. If you have too much noise, you will typically want to decrease min_samples. If \
-                            the priority is "not to be wrong" with assigning points to a cluster, you will want to select a larger value which will provide \
-                            a more conservative clustering (values larger than min_cluster_size do not make sense).'
-
-        min_samples = st.sidebar.number_input("min_samples  (currently single value only)",1, max_n_neighbors, value = 3, help = min_samples_help , key='min_samples')
+        min_samples = st.sidebar.number_input("min_samples  (currently single value only)",1, max_n_neighbors, value = 3, key='min_samples')
 
         
         #min_cluster_size = st.sidebar.slider('Select the range of min_cluster_size values to test:', 5,  max_n_neighbors, (8, 48), key='min_cluster_size')
@@ -268,16 +273,16 @@ def main():
 
         cluster_selection_method = st.sidebar.radio('Cluster selection method (currently single choice only):', ('eom', 'leaf'), key = 'cluster_selection_method')
         
-        cluster_selection_epsilon = st.sidebar.number_input('Maximum cluster selection epsilon:', min_value = 0.000, max_value = None, value =0.000, format="%f" )
-        eps_step = st.sidebar.number_input("Select the step for epsilon values: ", min_value =0.000, max_value = cluster_selection_epsilon, value = 0.000, format="%f", key='eps_step' )    
+
+
+
         
-        #cluster_selection_epsilon = st.sidebar.slider('Select the range of epsilon values to test as their 100-fold values (e.g. select 15 to set the upper limit to 0.15):',
-        #                 0,  100, key='cluster_selection_epsilon')   # I have to work on determining the upper bound - this could be done easily using the tree
+        cluster_selection_epsilon = st.sidebar.slider('Select the range of epsilon values to test as their 100-fold values (e.g. select 15 to set the upper limit to 0.15):',
+                         0,  100, key='cluster_selection_epsilon')   # I have to work on determining the upper bound
+ 
+ #     
+        eps_step = st.sidebar.number_input("Select the step for epsilon values (no scaling - to select 0.03, select 0.03): ", min_value =0.000, max_value = cluster_selection_epsilon/100, step = 0.001, value = 0.030, format="%f", key='eps_step' )    
      
-        #eps_step = st.sidebar.number_input("Select the step for epsilon values (no scaling - to select 0.03, select 0.03): ", min_value =0.000, max_value = cluster_selection_epsilon/100, step = 0.001, value = 0.030, format="%f", key='eps_step' )
-
-
-        
 
 ## happy
         max_acceptable_n_clusters = st.sidebar.number_input('Maximum acceptable number of clusters in your clustering:', min_value = 1, value = 350, key ='max_n_clusters')
@@ -325,16 +330,21 @@ def main():
 
             st.write('HDBSCAN models:')
             
-            for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
-                configurations[i] = {eps: HDBSCAN(min_cluster_size = i,
-                        min_samples = min_samples,
-                        cluster_selection_method =cluster_selection_method,
-                        cluster_selection_epsilon=eps,
-                        gen_min_span_tree=True,
-                        memory=r'./tmp_hdbscan_cache/',
-                        prediction_data=True) for eps in np.linspace(0,maxeps+epsstep,int(maxeps/epsstep))}
 
             
+            for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
+                configurations[i] = {eps/100: HDBSCAN(min_cluster_size = i,
+                        min_samples = min_samples,
+                        cluster_selection_method =cluster_selection_method,
+                        cluster_selection_epsilon=eps/100,
+                        gen_min_span_tree=True,
+                        memory=r'./tmp_hdbscan_cache/',
+                        prediction_data=True) for eps in range(0,maxeps+int(100*epsstep),int(100*(epsstep)))}
+
+            
+           
+
+
             #configurations.append({'n_neighbors':n_neighbors, 'n_components':number_dimensions, 'metric':umap_metric, 'min_dist':min_dist, 'random_state':random_state})   
             st.write(configurations)
                        
@@ -400,7 +410,7 @@ def main():
                 #####end  added after demo####
             
                     results_incl_eps = {nn:cluster_with_all_models_incl_eps(dimred[nn], st.session_state.configurations[0]) for nn in range(st.session_state.n_neighbors_min[0] , st.session_state.n_neighbors_max[0] + st.session_state.n_neighbors_step[0], st.session_state.n_neighbors_step[0] )}
-                    st.write(results_incl_eps)
+                    #st.write(results_incl_eps)
 
                     results = results_incl_eps
 
@@ -462,8 +472,8 @@ def main():
 
             
             
-                    #hyperparameters_plot.write_html(f"{number_dimensions}D_{umap_metric}_md{min_dist}_min_samples{min_samples}_{cluster_selection_method}.html")
-                    #hyperparameters_plot.show('browser')
+                    hyperparameters_plot.write_html(f"{number_dimensions}D_{umap_metric}_md{min_dist}_min_samples{min_samples}_{cluster_selection_method}.html")
+                    hyperparameters_plot.show('browser')
 
 
     #### Happy
@@ -514,8 +524,8 @@ def main():
                                                      title = f'n_neighbors {vizmodel}')                                #color = [str(int(i)) for i in results[vizmodel][mcs][0]]
                         
                             st.plotly_chart(curr_fig, use_container_width=True)
-                            #curr_fig.write_html(f"fig_{str(i)}.html")
-                            #curr_fig.show('browser')
+                            curr_fig.write_html(f"fig_{str(i)}.html")
+                            curr_fig.show('browser')
                             i=i+1
                     
               
@@ -550,24 +560,20 @@ def main():
                              size = 'n_clusters', size_max = 50, animation_frame='(UMAP) n_neighbors', height=1000, color = 'eps', color_continuous_scale='Turbo', range_y = [-5,1.05*(df['percent_unclustered'].max())])
                         st.plotly_chart(unclustered_vs_mcs, use_container_width=True) 
 
-                    
-                        
+               
                     with tab5:  
-                        st.subheader('Connectivity plots')
+                        st.subheader('Diagnostic plots')
+                        #for reasons that I do not understand, the connectivity plot does not work on streamlit cloud, however it does work when run locally
+                        #thus I am temporarily removing this part and instead I will implement other diagnostic plots 
                         if plot_connectivity == 'Yes':
-                            #st.write(results)
-                            #st.write(data.head(2))
-                            plt.figure(figsize=(7,5))
-                            
-                            #tmpplot = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, metric = umap_metric, random_state=random_state).fit(data)
-                            #umap.plot.diagnostic(tmpplot, diagnostic_type='pca')
-                            diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, metric = umap_metric, random_state=random_state).fit(data)
-                            #st.write(diagnostic_results_min_nn)
-                            #st.write(diagnostic_results_min_nn)
+                            st.write("Apologies, the connectivity plot is disabled in this version.")
+                            #plt.figure(figsize=(7,5))
+                            #diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
+                            #                             metric = umap_metric, random_state=random_state).fit(data)
                     
-                            umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis",  edge_bundling='hammer')   #width = 1800,
-                            st.write(" umap.plot.connectivity done")
-                            st.pyplot(plt)
+                            #umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis", width = 1800, edge_bundling='hammer')
+
+                            #st.pyplot(plt)
                         else:
                             st.write('You did not choose a connectivity plot to be made.')
                     
@@ -581,7 +587,11 @@ def main():
                         st.write("Results for all configurations:")
                         st.write(results_incl_eps)
 
-                     
+                      #for mcs in range(st.session_state.min_cluster_size_min[0],st.session_state.min_cluster_size_max[0] + st.session_state.cluster_step[0], st.session_state.cluster_step[0]):
+                        #i=1
+                                  
+                        #curr_fig =  px.scatter(data, x = vizred[vizmodel][:, 0], y = vizred[vizmodel][:, 1], hover_data={data.index.name: (data.index)}, color = [str(int(i)) for i in results[vizmodel][mcs][0]], title = f'n_neighbors {vizmodel}, minimal_cluster_size {mcs}, cluster_lection_epsilon 0, min_samples = {min_samples}, cluster_selection_method = {cluster_selection_method}, clustering in {number_dimensions}D')
+                        
                 #### end added after demo
 
                 #histogram_plot = px.histogram(results[6][16][0.15])     # no I don't want this, this shows how many points are in clusters -1 + 0, 2 + 3, etc; 
@@ -591,7 +601,7 @@ def main():
                 else:
                     st.write(f'Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
             except:
-                    st.write(f'(Try-Except)Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
+                    st.write(f'Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
 
 if __name__ == '__main__':
     main()
