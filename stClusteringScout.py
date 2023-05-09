@@ -74,25 +74,25 @@ def main():
     #@st.cache(persist=True)
     @st.cache_data  
     def load_covariates():
-        #covariates = pd.read_csv('.\DATA_and_EMBEDDINGS\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_index_reference.csv')
-        covariates = pd.read_csv(r'C:\Users\lkalvodova\OneDrive - Wiley\DESKTOP\WORK\DATA_SCIENCE\PYTHON\omics_2016-4Jul22_Qlik&ISI\omics_2016-4Jul22_Qlik_ISI_only_Articles_Letters_Reviews_with_abstract_index_reference.csv')
+        
+        covariates = pd.read_csv(r'C:\Users\....csv')
         return covariates
 
 
     def cluster_with_all_models_incl_eps(data,nested_dict):   
         st.write("nested dict:", nested_dict)
-        st.write(data)
+        #st.write(data)
         clustered = {}
         for i in nested_dict.keys():     # i - these are the mcs values
-            st.write(i)
+            #st.write(i)
             clustered[i] = {} 
             for j in nested_dict[i].keys():   # j - the eps values
-                st.write("eps value: ", j)
-                st.write(nested_dict[i][j])
-                st.write(data)
-                #clustered[i][j] = HDBSCAN().fit_predict(data)    #this step is working
-                clustered[i][j] = nested_dict[i][j].fit_predict(data)     #this step is failing but for the life of me I can't figure out why
-                st.write("after fit_predict: ", data)
+                #st.write("eps value: ", j)
+                #st.write(nested_dict[i][j])
+                #st.write(data)
+                
+                clustered[i][j] = nested_dict[i][j].fit_predict(data)     
+                
         return clustered
 
   
@@ -107,7 +107,7 @@ def main():
 
     "This app will help you choose parameters for dimension reduction and clustering based on your requirements for granularity and clustering completeness (i.e. you can input a threshold for maximum and minimum number of clusters and a threshold for maximum % of unclustered points). These thresholds will not influence getting the clustering results - they only influence the recommendations presented. This current version is very basic and does not provide any guidance for the selection of cluster_selection_epsilon ranges (this is planned to be implemented next) nor any cluster diagnostics."
 
-    st.markdown("First, please your load your data.")
+    st.markdown("First, please load your data.")
 
     has_index_col = st.radio("Use the 1st column as index? (say 'Yes' if the 1st column is NOT a variable, i.e. if the 1st column is for e.g. a unique identifier such as the title of the article or if it is a row number)", ('Yes', 'No ( ALL columns will be considered features (variables)! ). If your 2D plot looks very odd, check this again.'), key="has_index_col")
     
@@ -227,9 +227,7 @@ def main():
           
             # caveat - now if I say for eg maxeps is 1.5 and step is 1, it will go for eps 0 and 1, ie step overrides maxeps. Maybe I should have asked the user to define how many steps...
             
-            st.write('multiplier type: ', type(multiplier))
-            st.write("multiplier = ", multiplier)
-
+            
             n_neighbors_min = n_neighbors[0]
             n_neighbors_max = n_neighbors[1]
             n_neighbors_step = nn_step
@@ -254,10 +252,7 @@ def main():
           
 
             st.write('HDBSCAN models:')
-            
-            st.write("epsstep: ", epsstep)
-         
-
+                            
 
             for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
                 configurations[i] = {eps/multiplier: HDBSCAN(min_cluster_size = i,
@@ -323,14 +318,9 @@ def main():
                         #             cluster_selection_method = {cluster_selection_method}")
 
          
-                    st.write("now going to run dimred")
+                    
                     dimred = {nn:umap.UMAP(n_neighbors = nn, n_components = number_dimensions, min_dist=min_dist, metric = umap_metric, random_state=random_state).fit_transform(data) for nn in range(st.session_state.n_neighbors_min[0] , st.session_state.n_neighbors_max[0] + st.session_state.n_neighbors_step[0], st.session_state.n_neighbors_step[0] )}
-                    st.write("dimred has been run, here are the results:")
-                    st.write(dimred)
-                    st.write(dimred.keys())
-                    st.write(dimred[st.session_state.n_neighbors_min[0]])
-                    st.write(data)
-                    st.write("XXX")
+                    
                 #####start added after demo####
                 ### added after OPTI
                     if number_dimensions > 2:
@@ -340,7 +330,7 @@ def main():
                 #####end  added after demo####
             
                     results_incl_eps = {nn:cluster_with_all_models_incl_eps(dimred[nn], st.session_state.configurations[0]) for nn in range(st.session_state.n_neighbors_min[0] , st.session_state.n_neighbors_max[0] + st.session_state.n_neighbors_step[0], st.session_state.n_neighbors_step[0] )}
-                    st.write(results_incl_eps)
+                    #st.write(results_incl_eps)
 
                     results = results_incl_eps
 
@@ -490,13 +480,14 @@ def main():
                     with tab5:  
                         st.subheader('Connectivity plots')
                         if plot_connectivity == 'Yes':
-                            plt.figure(figsize=(7,5))
-                            diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
-                                                         metric = umap_metric, random_state=random_state).fit(data)
+                            st.write('Connectivity plot is temporarily disabled in this version, sorry about that.')
+                            #plt.figure(figsize=(7,5))
+                            #diagnostic_results_min_nn = umap.UMAP(n_neighbors = st.session_state.n_neighbors_min[0], n_components = 2, min_dist=0.0, 
+                            #                             metric = umap_metric, random_state=random_state).fit(data)
                     
-                            umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis", width = 1800, edge_bundling='hammer')
+                            #umap.plot.connectivity(diagnostic_results_min_nn, show_points=True, theme="viridis", width = 1800, edge_bundling='hammer')
 
-                            st.pyplot(plt)
+                            #st.pyplot(plt)
                         else:
                             st.write('You did not choose a connectivity plot to be made.')
                     
