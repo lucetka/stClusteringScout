@@ -80,7 +80,7 @@ def main():
 
 
     def cluster_with_all_models_incl_eps(data,nested_dict):   
-        st.write("nested dict:", nested_dict)
+        #st.write("nested dict:", nested_dict)
         #st.write(data)
         clustered = {}
         for i in nested_dict.keys():     # i - these are the mcs values
