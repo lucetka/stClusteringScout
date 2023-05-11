@@ -83,6 +83,8 @@ def main():
         #st.write("nested dict:", nested_dict)
         #st.write(data)
         clustered = {}
+        condensed_tree_df = {}
+        tree_df_clusters = {}
         for i in nested_dict.keys():     # i - these are the mcs values
             #st.write(i)
             clustered[i] = {} 
@@ -92,11 +94,13 @@ def main():
                 #st.write(data)
                 
                 clustered[i][j] = nested_dict[i][j].fit_predict(data)     
-                
+                if j == 0:
+                    condensed_tree_df[i] = nested_dict[i][j].condensed_tree_.to_pandas()
+                    tree_df_clusters[i] = condensed_tree_df[i][condensed_tree_df[i].child_size > 1]
+
+                    ### as a temporary testing pseudosolution I will simply print the values without printing the UMAP model
+                    st.write(f"Recommended max eps for mcs = {i}: ", 1/(tree_df_clusters[i]['lambda_val'].min()))
         return clustered
-
-  
-
 
     #******************************************
 
@@ -197,7 +201,7 @@ def main():
         
 
         cluster_selection_epsilon = st.sidebar.number_input('Maximum cluster selection epsilon:', min_value = 0.000, max_value = None, value =0.030 , key = 'cluster_selection_epsilon' )   #, format="%f"
-        eps_step = st.sidebar.number_input("Select the step for epsilon values: ", min_value =0.000, max_value = cluster_selection_epsilon, value = 0.000, key='eps_step' )     #, format="%f" 
+        eps_step = st.sidebar.number_input("Select the step for epsilon values: ", min_value =0.000,  value = 0.000, key='eps_step' )     #, format="%f"   max_value = cluster_selection_epsilon,
  
 
         max_acceptable_n_clusters = st.sidebar.number_input('Maximum acceptable number of clusters in your clustering:', min_value = 1, value = 350, key ='max_n_clusters')
@@ -225,13 +229,16 @@ def main():
                 
             
             # if both maxeps and epsstep are integers, multiplier will be 1
-            if ((maxeps == int(maxeps)) and (epsstep == int(epsstep))):
+            if (((maxeps == int(maxeps)) and (epsstep == int(epsstep))) or (maxeps == 0)):
                 multiplier = int(1)
             else:
                 if (epsstep <= 1):
                     multiplier = int(np.power(10,(np.ceil(-np.log10(epsstep)))))
                 else:
                     multiplier = int(np.power(10,(np.ceil(np.log10(maxeps)))))
+            
+            if(maxeps == 0):
+                epsstep = 0
           
             # caveat - now if I say for eg maxeps is 1.5 and step is 1, it will go for eps 0 and 1, ie step overrides maxeps. Maybe I should have asked the user to define how many steps...
             
@@ -262,14 +269,25 @@ def main():
             st.write('HDBSCAN models:')
                             
 
-            for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
-                configurations[i] = {eps/multiplier: HDBSCAN(min_cluster_size = i,
-                        min_samples = min_samples,
-                        cluster_selection_method =cluster_selection_method,
-                        cluster_selection_epsilon=eps/multiplier,
-                        gen_min_span_tree=True,
-                        memory=r'./tmp_hdbscan_cache/',
-                        prediction_data=True) for eps in range(0,int(multiplier*maxeps)+int(multiplier*epsstep),int(multiplier*(epsstep)))}   #(0, maxeps+epsstep, epsstep)   } #np.linspace(0,maxeps,int(maxeps/epsstep))}
+            if epsstep != 0:
+                for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
+                    configurations[i] = {eps/multiplier: HDBSCAN(min_cluster_size = i,
+                            min_samples = min_samples,
+                            cluster_selection_method =cluster_selection_method,
+                            cluster_selection_epsilon=eps/multiplier,
+                            gen_min_span_tree=True,
+                            memory=r'./tmp_hdbscan_cache/',
+                            prediction_data=True) for eps in range(0,int(multiplier*maxeps)+int(multiplier*epsstep),int(multiplier*(epsstep)))}   #(0, maxeps+epsstep, epsstep)   } #np.linspace(0,maxeps,int(maxeps/epsstep))}
+            
+            else:
+                for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
+                    configurations[i] = {0/multiplier: HDBSCAN(min_cluster_size = i,
+                            min_samples = min_samples,
+                            cluster_selection_method =cluster_selection_method,
+                            cluster_selection_epsilon=0/multiplier,
+                            gen_min_span_tree=True,
+                            memory=r'./tmp_hdbscan_cache/',
+                            prediction_data=True) }
             
 
 
