@@ -169,7 +169,15 @@ def main():
        
         st.sidebar.subheader("HDBSCAN hyperparameters")
 
-        min_samples = st.sidebar.number_input("min_samples  (currently single value only)",1, max_n_neighbors, value = 3, key='min_samples')
+        min_samples_help = 'Higher value means more points will be discarded as noise. While minimal cluster size determines the minimal size of a final cluster to be returned, \
+                            the min_samples parameter determines which points will be assigned to a cluster and which will be discarded as noise. Having large min_cluster_size \
+                            but small min_samples value will minimze the number of points discarded as noise and may in the end effect lead to less homogenous \
+                            clusters resulting from condensing smaller neighboring clusters together to yield superclusters with the specified minimal size. In other words, \
+                            the min_samples parameter determines how conservative your clustering will be. If you have too much noise, you will typically want to decrease min_samples. If \
+                            the priority is "not to be wrong" with assigning points to a cluster, you will want to select a larger value which will provide \
+                            a more conservative clustering (values larger than min_cluster_size do not make sense).'
+        
+        min_samples = st.sidebar.number_input("min_samples  (currently single value only)",1, max_n_neighbors, help = min_samples_help, value = 3, key='min_samples')
 
         
         #min_cluster_size = st.sidebar.slider('Select the range of min_cluster_size values to test:', 5,  max_n_neighbors, (8, 48), key='min_cluster_size')
@@ -516,7 +524,7 @@ def main():
                     st.write(f'Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
             except BaseException as error:
                     st.write('An exception occurred: {}'.format(error))
-                    st.write(f'(Try except)Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
+                    st.write(f'(Try/Except)Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
 
 if __name__ == '__main__':
     main()
