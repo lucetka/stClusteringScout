@@ -1,32 +1,19 @@
 ### Thank you for studying my code. You will not learn anything new here.
 ### --Lucie
 
-### This is my learning project. I am still experimenting here. It's my 2nd Streamlit app and my first deployed app.
+### This is my learning project. I am still experimenting here and it's a mess. It's my 2nd Streamlit app and my first deployed app.
 ### This is also the first time I am using GitHub to do more than just as a manual backup. 
 
 
 #### irrlevant chatter with myself:
 ## starting from stOPTICRAP (which had started from stHAPPYCRAPPER, a descendant of stMULTICRAPPER, which in turn had started from simple CRAP)
+## then came stClusteringScout_eps and finally stClusteringScout_eps_NEW.py
 
-### to do:
-
-### - 1. split summary plot and recommendations
-### - do something about the printed dict
-### - tooltips and description
-### - clusterplot
-### - "icicle tree"
-### - covariates
-### - BT?
-###
-
-### *** i should alos put number_dimensions to session state but then I have to change it when using it later to st.session....
-
-# if number_dimensions = "No dimensionality reduction" .... then what?
 #######################
 import streamlit as st
 
-from st_aggrid import AgGrid
-from st_aggrid.grid_options_builder import GridOptionsBuilder
+#from st_aggrid import AgGrid
+#from st_aggrid.grid_options_builder import GridOptionsBuilder
 
 import pandas as pd
 
@@ -79,28 +66,47 @@ def main():
         return covariates
 
 
-    def cluster_with_all_models_incl_eps(data,nested_dict):   
-        #st.write("nested dict:", nested_dict)
-        #st.write(data)
+ 
+    def cluster_with_all_models_incl_eps(nn,data,nested_dict):   
+        
         clustered = {}
-        condensed_tree_df = {}
-        tree_df_clusters = {}
+              
+        
         for i in nested_dict.keys():     # i - these are the mcs values
-            #st.write(i)
-            clustered[i] = {} 
-            for j in nested_dict[i].keys():   # j - the eps values
-                #st.write("eps value: ", j)
-                #st.write(nested_dict[i][j])
-                #st.write(data)
-                
-                clustered[i][j] = nested_dict[i][j].fit_predict(data)     
-                if j == 0:
-                    condensed_tree_df[i] = nested_dict[i][j].condensed_tree_.to_pandas()
-                    tree_df_clusters[i] = condensed_tree_df[i][condensed_tree_df[i].child_size > 1]
+           
+            clustered[i] = [{},{}]   ### the 2nd outmost dictionary with mcs as keys will hold a list of two dictionaries, the first one with eps values and the 2nd one with useful eps ranges
+            my_current_range = "not applicable"
 
-                    ### as a temporary testing pseudosolution I will simply print the values without printing the UMAP model
-                    st.write(f"Recommended max eps for mcs = {i}: ", 1/(tree_df_clusters[i]['lambda_val'].min()))
+            for j in nested_dict[i].keys():   # j - the eps values
+           
+                clustered[i][0][j] = nested_dict[i][j].fit_predict(data)
+                #st.write(clustered[i][0][j])
+                #st.write(clustered[i][0])
+                #st.write(clustered[i][1])
+
+                if j == 0:    #for eps 0 we calculate the range
+                    
+                    condensed_tree_df = nested_dict[i][j].condensed_tree_.to_pandas()
+                    
+                    tree_df_clusters = condensed_tree_df[condensed_tree_df.child_size > 1]
+                    selected_clusters = nested_dict[i][j].condensed_tree_._select_clusters()
+                    
+                    eps_recommender_df = tree_df_clusters.loc[tree_df_clusters['child'].isin(selected_clusters) ]
+                    eps_recommender_df['eps'] = eps_recommender_df['lambda_val'].apply(lambda x: 1/x)
+                                      
+                    #st.write(f"UMAP(n_neighbors = {nn}), mcs = {i}: Eps values up to {eps_recommender_df['eps'].min()} will have no effect. Try setting your maximum eps to a value above this value but probably you will want to stay well below {eps_recommender_df['eps'].nlargest(2).min()} where the dataset will be split to only 2 clusters or not at all.")
+                    
+                    my_current_range = (eps_recommender_df['eps'].min(),eps_recommender_df['eps'].nlargest(2).min())
+
+               
+                    
+         
+            clustered[i][1] = {"Useful eps range":my_current_range}
+            #st.write(clustered[i])
+
         return clustered
+
+
 
     #******************************************
 
@@ -109,7 +115,7 @@ def main():
     st.title("Compare clusterings with multiple UMAP and HDBSCAN models")
     st.sidebar.title("CLUSTERING SCOUT")
 
-    "This app will help you choose parameters for dimension reduction and clustering based on your requirements for granularity and clustering completeness (i.e. you can input a threshold for maximum and minimum number of clusters and a threshold for maximum % of unclustered points). These thresholds will not influence getting the clustering results - they only influence the recommendations presented. This current version is very basic and does not provide any guidance for the selection of cluster_selection_epsilon ranges (this is planned to be implemented next) nor any cluster diagnostics."
+    "This app will help you choose parameters for dimension reduction and clustering based on your requirements for granularity and clustering completeness (i.e. you can input a threshold for maximum and minimum number of clusters and a threshold for maximum % of unclustered points). These thresholds will not influence getting the clustering results - they only influence the recommendations presented. This current version is very basic and does not show any cluster diagnostics. Another limitation is that the lower range of cluster_selection_epsilon is fixed to 0, so even if your useful range lies well above 0, you will be iterating over the ineffective range. Sorry. This will be fixed soon."
 
     st.markdown("First, please load your data.")
 
@@ -173,15 +179,7 @@ def main():
        
         st.sidebar.subheader("HDBSCAN hyperparameters")
 
-        min_samples_help = 'Higher value means more points will be discarded as noise. While minimal cluster size determines the minimal size of a final cluster to be returned, \
-                            the min_samples parameter determines which points will be assigned to a cluster and which will be discarded as noise. Having large min_cluster_size \
-                            but small min_samples value will minimze the number of points discarded as noise and may in the end effect lead to less homogenous \
-                            clusters resulting from condensing smaller neighboring clusters together to yield superclusters with the specified minimal size. In other words, \
-                            the min_samples parameter determines how conservative your clustering will be. If you have too much noise, you will typically want to decrease min_samples. If \
-                            the priority is "not to be wrong" with assigning points to a cluster, you will want to select a larger value which will provide \
-                            a more conservative clustering (values larger than min_cluster_size do not make sense).'
-        
-        min_samples = st.sidebar.number_input("min_samples  (currently single value only)",1, max_n_neighbors, help = min_samples_help, value = 3, key='min_samples')
+        min_samples = st.sidebar.number_input("min_samples  (currently single value only)",1, max_n_neighbors, value = 3, key='min_samples')
 
         
         #min_cluster_size = st.sidebar.slider('Select the range of min_cluster_size values to test:', 5,  max_n_neighbors, (8, 48), key='min_cluster_size')
@@ -199,10 +197,10 @@ def main():
 
         cluster_selection_method = st.sidebar.radio('Cluster selection method (currently single choice only):', ('eom', 'leaf'), key = 'cluster_selection_method')
         
-
-        cluster_selection_epsilon = st.sidebar.number_input('Maximum cluster selection epsilon:', min_value = 0.000, max_value = None, value =0.030 , key = 'cluster_selection_epsilon' )   #, format="%f"
-        eps_step = st.sidebar.number_input("Select the step for epsilon values: ", min_value =0.000,  value = 0.000, key='eps_step' )     #, format="%f"   max_value = cluster_selection_epsilon,
- 
+        st.sidebar.write("If you have no clue about the range of eps values to try, please run it first without a range, i.e. select 0.00 as the maximum, and look at the recommendation for the maximum eps which you can try next with a number of equidistant steps of your choice.")
+        cluster_selection_epsilon = st.sidebar.number_input('Maximum cluster selection epsilon:', min_value = 0.00000000, max_value = None, value =0.030 , format="%.8f", key = 'cluster_selection_epsilon' )   #, format="%f"
+        eps_step = st.sidebar.number_input("Select the step for epsilon values: ", min_value =0.00000000,  value = 0.03000000, format="%.8f", key='eps_step' )     #, format="%f" max_value = cluster_selection_epsilon,
+  
 
         max_acceptable_n_clusters = st.sidebar.number_input('Maximum acceptable number of clusters in your clustering:', min_value = 1, value = 350, key ='max_n_clusters')
         min_acceptable_n_clusters = st.sidebar.number_input('Mminimum acceptable number of clusters in your clustering:', min_value = 1, value = 100, key ='min_n_clusters')
@@ -236,10 +234,12 @@ def main():
                     multiplier = int(np.power(10,(np.ceil(-np.log10(epsstep)))))
                 else:
                     multiplier = int(np.power(10,(np.ceil(np.log10(maxeps)))))
+          
+            
             
             if(maxeps == 0):
                 epsstep = 0
-          
+
             # caveat - now if I say for eg maxeps is 1.5 and step is 1, it will go for eps 0 and 1, ie step overrides maxeps. Maybe I should have asked the user to define how many steps...
             
             
@@ -249,7 +249,11 @@ def main():
             
                   
                  # I just want to print the models for the user to check:
-            st.write('UMAP models:')
+            st.write("THE FOLLOWING MODELS WILL BE USED -- IF YOU HAVE CREATED A LOT OF MODELS, IT IS GOING TO TAKE VERY LONG TO RUN. ")
+            st.write("Each of the following UMAP models will be used with each of the HDBSCAN models.")
+            st.write("PLEASE DO CHECK!")
+            st.write("")
+            st.write('UMAP models formated as n_neighbors: model :')
             umap_models = {nn:umap.UMAP(n_neighbors = nn, n_components = number_dimensions, min_dist=min_dist, metric = umap_metric, random_state=random_state) for nn in range(n_neighbors_min , n_neighbors_max+n_neighbors_step, n_neighbors_step )}
             
                 #   let's plot for the extreme cases of nn
@@ -266,9 +270,8 @@ def main():
             cluster_step = mcs_step
           
 
-            st.write('HDBSCAN models:')
+            st.write('HDBSCAN models formated as min_cluster_size: cluster_selection_epsilon: model ')
                             
-
             if epsstep != 0:
                 for i in range(min_cluster_size_min,min_cluster_size_max+cluster_step, cluster_step):        
                     configurations[i] = {eps/multiplier: HDBSCAN(min_cluster_size = i,
@@ -288,8 +291,6 @@ def main():
                             gen_min_span_tree=True,
                             memory=r'./tmp_hdbscan_cache/',
                             prediction_data=True) }
-            
-
 
                 #configurations.append({'n_neighbors':n_neighbors, 'n_components':number_dimensions, 'metric':umap_metric, 'min_dist':min_dist, 'random_state':random_state})   
             st.write(configurations)
@@ -355,10 +356,31 @@ def main():
                         vizred = dimred
                 #####end  added after demo####
             
-                    results_incl_eps = {nn:cluster_with_all_models_incl_eps(dimred[nn], st.session_state.configurations[0]) for nn in range(st.session_state.n_neighbors_min[0] , st.session_state.n_neighbors_max[0] + st.session_state.n_neighbors_step[0], st.session_state.n_neighbors_step[0] )}
+                    results_incl_eps = {nn:cluster_with_all_models_incl_eps(nn, dimred[nn], st.session_state.configurations[0]) for nn in range(st.session_state.n_neighbors_min[0] , st.session_state.n_neighbors_max[0] + st.session_state.n_neighbors_step[0], st.session_state.n_neighbors_step[0] )}
                     #st.write(results_incl_eps)
 
-                    results = results_incl_eps
+                    # now the results_incl_eps is in fact an even more monstrous dictionary than in the original versions because now it also holds the useful eps ranges
+                    # in order to be able to use the results for plotting etc I would **either** have to change everything below to refer to the results with an additional locator for the eps dictionary,
+                    # i.e. by referring to it as the first dictionary in the list of dictionaris under the mcs dictionary, ie [0]
+                    # **or**, and that's what I'm going to to, I would have to get rid of the Range dictionary within the list and convert it to the same format it used to be,
+                    # ie only {nn:{mcs:{eps:clustering results}}} instead of {nn:{mcs:{[{eps:clustering results}, {Range:ranges}]}}}
+
+                    # so previously I used to set an alias anyways by saying results = results_incl_eps      --  which is handy now 
+                    # instead, the "results" will now be the "reduced version"
+                    results = {nn:{mcs:{k:v for k,v in results_incl_eps[nn][mcs][0].items()} for mcs in results_incl_eps[nn].keys()} for nn in results_incl_eps.keys()}
+
+                    #st.write(results)
+
+                    ### And I will make a separate dictionary to hold only the ranges:
+                    useful_eps_ranges = {nn:{mcs:{k:v for k,v in results_incl_eps[nn][mcs][1].items()} for mcs in results_incl_eps[nn].keys()} for nn in results_incl_eps.keys()}
+                    #st.write(useful_eps_ranges)
+                    #######################
+                   
+
+
+
+
+###################################################
 
                 # for each UMAP model I will have 1 dataframe with mcs and eps
                     dataframes = {}
@@ -448,7 +470,7 @@ def main():
                   
             # 
             #    
-                    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([ "2D plots", "Summary plot", "Recommendations", "Clusterings vs hyperparameters", "Diagnostic plots", "Models in use"])
+                    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([ "2D plots", "Cluster_selection_epsilon range recommendations", "Summary plot", "Recommendations", "Clusterings vs hyperparameters", "Diagnostic plots", "Models in use"])
 
                     
 
@@ -470,14 +492,27 @@ def main():
                             #curr_fig.show('browser')
                             i=i+1
                     
-              
-
                     with tab2:
+                        st.header("Recommended ranges of cluster_selection_epsilon")
+                        st.write("Eps values up to the lower threshold will have no effect. Try setting your maximum eps to a value above this value but probably you will want to stay well below the upper threshold where the dataset will be split to only 2 clusters or not at all.")
+                        st.write("   ")
+                        #st.write("For example, ")
+                        eps_ranges_df = pd.DataFrame(useful_eps_ranges)
+                        st.write(f"For example, for clustering using UMAP model with {eps_ranges_df.columns[0]} n_neighors and min_cluster_size set to {eps_ranges_df.index[0]}, the useful range is from {eps_ranges_df.iloc[0,0]['Useful eps range'][0]} to {eps_ranges_df.iloc[0,0]['Useful eps range'][1]}. ")
+                        st.write(f"This means that cluster_selection_eps values up to {eps_ranges_df.iloc[0,0]['Useful eps range'][0]} will have no effect.")
+                        st.write(f"If using this model, try setting your maximum eps to a value above this value but probably you will want to stay well below {eps_ranges_df.iloc[0,0]['Useful eps range'][1]} where the dataset will be split to only 2 clusters or not at all.")
+
+                        eps_ranges_df = eps_ranges_df.add_prefix('n_neighbors(UMAP)_')
+                        eps_ranges_df.index.names = ['Min cluster size']
+                        st.write(eps_ranges_df)
+                        
+
+                    with tab3:
                         st.header("Summary plot")
                         st.plotly_chart(hyperparameters_plot, use_container_width=True)
 
                     
-                    with tab3:
+                    with tab4:
                         st.header("Recommendations")
                         
 
@@ -489,7 +524,7 @@ def main():
 
 
             
-                    with tab4:
+                    with tab5:
                         st.header("Clusterings vs hyperparameters plots")
                         unclustered_vs_mcs_line = px.line(df, x = 'min_cluster_size', y = 'percent_unclustered', 
                                     animation_frame='(UMAP) n_neighbors', height=500, color = 'eps' , range_y = [0,1.05*(df['percent_unclustered'].max())] )
@@ -503,7 +538,7 @@ def main():
                         st.plotly_chart(unclustered_vs_mcs, use_container_width=True) 
 
                
-                    with tab5:  
+                    with tab6:  
                         st.subheader('Connectivity plots')
                         if plot_connectivity == 'Yes':
                             st.write('Connectivity plot is temporarily disabled in this version, sorry about that.')
@@ -517,7 +552,7 @@ def main():
                         else:
                             st.write('You did not choose a connectivity plot to be made.')
                     
-                    with tab6:
+                    with tab7:
                         st.header("UMAP and HDBSCAN models in use & results")
                             #st.write(results)
                         st.write("UMAP models:")
@@ -542,7 +577,22 @@ def main():
                     st.write(f'Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
             except BaseException as error:
                     st.write('An exception occurred: {}'.format(error))
-                    st.write(f'(Try/Except)Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
+                    st.write(f'(Try except)Please make sure to load valid data (currently no missing values are allowed) and create models first. Uploaded file: {uploaded_file}, len models: {len(st.session_state.umap_models[0])}')
 
 if __name__ == '__main__':
     main()
+
+
+
+### to do:
+
+### - clusterplot
+### - "icicle tree"
+### - covariates
+### - BT?
+### - add option to bypass dimensionality reduction
+
+
+### *** I should also put number_dimensions to session state but then I have to change it when using it later to st.session....
+
+# if number_dimensions = "No dimensionality reduction" .... then what?
