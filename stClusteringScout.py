@@ -1,3 +1,8 @@
+
+### this is stClusteringScout_Cookie.py from 2-Dec-2025 !!!!!
+
+
+
 ### Thank you for studying my code. You will not learn anything new here.
 ### --Lucie
 
