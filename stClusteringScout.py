@@ -1,6 +1,5 @@
 
-# This is stClusteringScout_Spekulatius.py version from Mon Dec 8th 2025
-
+# replacing stClusteringScout_Spekulatius.py version from Mon Dec 8th 2025 with _nutella
 # Cookie was a working and deployed version with exporting HDBSCAN results but without UMAP results exported.
 # Friday Dec 5th I added UMAP saving but messed up model writing and the sidebar behavior was messed up, it appeared only AFTER data upload.
 # Also help tooltips were gone. I named this Spekulatius. Monday Dec 8th I fixed Spekulatius but created more errors and finally I restarted from from Cookie
@@ -10,6 +9,7 @@
 
 import io
 import zipfile
+import colorcet as cc
 
 import numpy as np
 import pandas as pd
@@ -18,17 +18,57 @@ import streamlit as st
 import umap
 from hdbscan import HDBSCAN
 
+import json
+
 st.set_page_config(layout="wide")
 np.random.RandomState(42)
 
+
 @st.cache_data
 def build_export_table(results, data, number_dimensions, min_samples):
+
     export_df = pd.DataFrame({"ID": data.index})
+
+    # STEP 1: Build ALL clustering columns
     for nn in results.keys():
         for mcs in results[nn].keys():
             for eps, labels in results[nn][mcs].items():
                 col_name = f"{number_dimensions}D_nn{nn}_mins{min_samples}_MSC{mcs}_eps{eps}"
                 export_df[col_name] = labels
+
+    # STEP 2: Add ONE reference color column
+    if (
+        "color_map" in st.session_state and
+        "color_ref_nn" in st.session_state and
+        "color_ref_mcs" in st.session_state
+    ):
+        try:
+            nn = st.session_state["color_ref_nn"]
+            mcs = st.session_state["color_ref_mcs"]
+
+            # ✅ SAFE handling of eps key
+            # eps=0 reference (with fallback safety)
+            eps_dict = results[nn][mcs]
+            ref_labels = eps_dict[0.0] if 0.0 in eps_dict else eps_dict[0]
+
+            #export_df["Color_ref_eps0"] = [
+            #    st.session_state["color_map"].get(str(int(lbl)), "#000000")
+            #    for lbl in ref_labels
+            #]
+            nn = st.session_state["color_ref_nn"]
+            mcs = st.session_state["color_ref_mcs"]
+
+            col_name = f"Color_{number_dimensions}D_nn{nn}_mins{min_samples}_MSC{mcs}_eps0"
+
+            export_df[col_name] = [
+                st.session_state["color_map"].get(str(int(lbl)), "#000000")
+                for lbl in ref_labels
+            ]
+
+        except Exception as e:
+            print("Color column failed:", e)
+
+    # STEP 3: Return final table
     return export_df
 
 @st.cache_data
@@ -42,24 +82,124 @@ def load_data(uploaded_file, has_index_col):
         return None
     return data_local
 
+def build_color_map(cluster_labels):
+    #import colorcet as cc
 
-def cluster_with_all_models_incl_eps(nn, data_nd, nested_dict):
+    unique = sorted(set(cluster_labels))
+    
+    # Remove noise temporarily
+    non_noise = [c for c in unique if c != -1]
+
+    palette = list(cc.glasbey) + list(cc.glasbey_cool)
+
+    color_map = {}
+
+    for i, cluster_id in enumerate(non_noise):
+        color_map[str(cluster_id)] = palette[i % len(palette)]
+
+    # Noise always white
+    if -1 in unique:
+        color_map["-1"] = "#FFFFFF"
+
+    return color_map
+
+
+def _exemplar_indices_from_tree(clusterer):
+    """
+    Return a list of 1D integer index arrays, one per selected cluster,
+    computed from the condensed tree + prediction data.
+
+    This mirrors the approach discussed by HDBSCAN maintainers:
+    - iterate selected clusters
+    - for each leaf in the cluster's DFS, find points at the leaf's max lambda
+    - collect their 'child' indices (these are data row indices)
+    """
+    try:
+        selected_clusters = clusterer.condensed_tree_._select_clusters()
+        raw = clusterer.condensed_tree_._raw_tree  # structured np array with fields incl. 'parent','child','lambda_val'
+        ex_list = []
+
+        # Requires prediction_data=True on the model (your code already sets this)
+        recurse = clusterer._prediction_data._recurse_leaf_dfs
+
+        for cluster in selected_clusters:
+            cluster_ex = np.array([], dtype=np.int64)
+            # DFS over leaves that belong to this selected cluster
+            for leaf in recurse(cluster):
+                mask = (raw['parent'] == leaf)
+                if not np.any(mask):
+                    continue
+                # For this leaf, take children at max lambda (most persistent members)
+                leaf_max_lambda = raw['lambda_val'][mask].max()
+                pts_mask = mask & (raw['lambda_val'] == leaf_max_lambda)
+                points = raw['child'][pts_mask]
+                # Append
+                if points.size > 0:
+                    cluster_ex = np.hstack([cluster_ex, points.astype(np.int64, copy=False)])
+            ex_list.append(cluster_ex)
+        return ex_list
+    except Exception:
+        # If anything goes wrong (e.g., prediction_data missing), return None
+        return None
+
+
+def cluster_with_all_models_incl_eps(nn, data_nd, nested_dict, data_index, id_col_name="ID"):
+    """
+    For each min_cluster_size in 'nested_dict' run all HDBSCAN models (varying eps),
+    return per-mcs a 3-part structure:
+      [0] dict: eps -> labels (np.array)
+      [1] dict: {"Useful eps range": (min_eps, second_largest_eps)}
+      [2] dict (only for eps=0): {
+            "condensed_tree_df": DataFrame,
+            "exemplars_df": DataFrame with columns [cluster, row_index, <id_col_name>]
+          }
+    """
     clustered = {}
     for mcs in nested_dict.keys():
-        clustered[mcs] = [{}, {}]
+        clustered[mcs] = [{}, {}, {}]
         my_range = "not applicable"
+
         for eps_val, model in nested_dict[mcs].items():
             labels = model.fit_predict(data_nd)
             clustered[mcs][0][eps_val] = labels
+
             if eps_val == 0:
+                # 1) Condensed tree export
                 condensed_tree_df = model.condensed_tree_.to_pandas()
+
+                # 2) Useful epsilon range (from selected cluster branches)
                 tree_df_clusters = condensed_tree_df[condensed_tree_df.child_size > 1]
                 selected = model.condensed_tree_._select_clusters()
-                eps_df = tree_df_clusters.loc[tree_df_clusters["child"].isin(selected)]
+                eps_df = tree_df_clusters.loc[tree_df_clusters["child"].isin(selected)].copy()
                 eps_df["eps"] = eps_df["lambda_val"].apply(lambda x: 1 / x)
                 my_range = (eps_df["eps"].min(), eps_df["eps"].nlargest(2).min())
+
+                # 3) Exemplars (indices), then map to IDs
+                exemplar_idx_list = _exemplar_indices_from_tree(model)  # list of arrays of integer indices
+                ex_records = []
+                if exemplar_idx_list is not None:
+                    for cluster_label, idx_array in enumerate(exemplar_idx_list):
+                        # Ensure 1-D int64 array
+                        idx_array = np.asarray(idx_array).ravel().astype(np.int64, copy=False)
+                        for idx in idx_array:
+                            # idx is guaranteed an integer scalar here
+                            # Map to original ID via 'data_index'
+                            ex_records.append({
+                                "cluster": int(cluster_label),
+                                "row_index": int(np.asarray(idx).item()),
+                                id_col_name: data_index[int(np.asarray(idx).item())]
+                            })
+                exemplars_df = pd.DataFrame(ex_records)
+
+                clustered[mcs][2] = {
+                    "condensed_tree_df": condensed_tree_df,
+                    "exemplars_df": exemplars_df
+                }
+
         clustered[mcs][1] = {"Useful eps range": my_range}
+
     return clustered
+
 
 # ---------------- UI ----------------
 st.title("Compare clusterings with multiple UMAP and HDBSCAN models")
@@ -253,6 +393,9 @@ if create_models_clicked and uploaded_file is not None:
 
 # Calculate
 if calculate_clicked and uploaded_file is not None:
+#if (
+#    (calculate_clicked or st.session_state.get("calculation_done", False))
+#    and uploaded_file is not None):
     try:
         if "models_umap" not in st.session_state or len(st.session_state["models_umap"]) == 0:
             st.warning("Please create models first.")
@@ -261,6 +404,11 @@ if calculate_clicked and uploaded_file is not None:
         if data is None:
             st.warning("Uploaded data has missing values; please fix and retry.")
             st.stop()
+
+
+        # Resolve the display name for the ID column (used in exemplars export)
+        id_col_name = data.index.name or "ID"
+
 
         dimred = {
             nn: umap.UMAP(
@@ -300,14 +448,22 @@ if calculate_clicked and uploaded_file is not None:
         nn_max = st.session_state["models_n_neighbors_max"]
         vizred = {nn_min: umap2d_all[nn_min], nn_max: umap2d_all[nn_max]}
 
+      
         results_incl_eps = {
-            nn: cluster_with_all_models_incl_eps(nn, dimred[nn], st.session_state["models_hdbscan_configs"])
+            nn: cluster_with_all_models_incl_eps(
+                nn,
+                dimred[nn],
+                st.session_state["models_hdbscan_configs"],
+                data.index,          # <— pass original index so we can map exemplars
+                id_col_name          # <— pass the name for the ID column
+            )
             for nn in range(
                 st.session_state["models_n_neighbors_min"],
                 st.session_state["models_n_neighbors_max"] + st.session_state["models_n_neighbors_step"],
                 st.session_state["models_n_neighbors_step"],
             )
         }
+
         results = {nn: {mcs: dlist[0] for mcs, dlist in results_incl_eps[nn].items()} for nn in results_incl_eps}
         useful_eps_ranges = {nn: {mcs: dlist[1] for mcs, dlist in results_incl_eps[nn].items()} for nn in results_incl_eps}
 
@@ -345,132 +501,227 @@ if calculate_clicked and uploaded_file is not None:
         compliant_results_eps0 = df.loc[((df["n_clusters"] >= max(1, min_acceptable_n_clusters)) & (df["n_clusters"] <= max_acceptable_n_clusters)) & (df["eps"] == 0.00)].sort_values(by=["percent_unclustered"]) 
         compliant_results_all = df.loc[(df["n_clusters"] >= max(1, min_acceptable_n_clusters)) & (df["n_clusters"] <= max_acceptable_n_clusters)].sort_values(by=["percent_unclustered"]) 
 
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+
+
+    
+        # ✅ PERSIST RESULTS (THIS IS WHAT YOU WERE MISSING)
+        #st.session_state["results_incl_eps"] = results_incl_eps
+        #st.session_state["results"] = results
+        #st.session_state["df"] = df
+        #st.session_state["useful_eps_ranges"] = useful_eps_ranges
+        #st.session_state["calculation_done"] = True
+        #st.session_state["hyperparameters_plot"] = hyperparameters_plot
+        st.session_state["results_incl_eps"] = results_incl_eps
+        st.session_state["results"] = results
+        st.session_state["df"] = df
+        st.session_state["useful_eps_ranges"] = useful_eps_ranges
+        st.session_state["hyperparameters_plot"] = hyperparameters_plot
+        st.session_state["compliant_results_eps0"] = compliant_results_eps0
+        st.session_state["compliant_results_all"] = compliant_results_all
+        st.session_state["calculation_done"] = True
+
+
+    except Exception as e:
+        st.exception(e)
+        st.error("Calculation failed. Review parameters and try again.")
+    
+# ✅ DISPLAY BLOCK (persistent, no recompute)
+
+if st.session_state.get("calculation_done", False):
+
+    results_incl_eps = st.session_state["results_incl_eps"]
+    results = st.session_state["results"]
+    df = st.session_state["df"]
+    useful_eps_ranges = st.session_state["useful_eps_ranges"]
+    hyperparameters_plot = st.session_state["hyperparameters_plot"]
+    
+    compliant_results_eps0 = st.session_state["compliant_results_eps0"]
+    compliant_results_all = st.session_state["compliant_results_all"]
+
+    data = load_data(uploaded_file, has_index_col)
+    nn_min = st.session_state["models_n_neighbors_min"]
+    nn_max = st.session_state["models_n_neighbors_max"]
+    vizred = st.session_state["umap2d_all_store"]
+
+    # 👉 PASTE THE TABS BLOCK HERE
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "2D plots", "Cluster_selection_epsilon range recommendations", "Summary plot", "Recommendations",
-            "Clusterings vs hyperparameters", "Diagnostic plots", "Models in use", "Download results"
-        ])
-        with tab1:
+            "Clusterings vs hyperparameters", "Diagnostic plots", "Models in use", "Download results"])
+    with tab1:
             st.header("2D plots using min and max n_neighbors")
             fig_1 = px.scatter(data, x=vizred[nn_min][:,0], y=vizred[nn_min][:,1], hover_data={data.index.name or "ID": data.index}, title=f"n_neighbors {nn_min}")
             fig_2 = px.scatter(data, x=vizred[nn_max][:,0], y=vizred[nn_max][:,1], hover_data={data.index.name or "ID": data.index}, title=f"n_neighbors {nn_max}")
             st.plotly_chart(fig_1, use_container_width=True)
             st.plotly_chart(fig_2, use_container_width=True)
-        with tab2:
-            st.header("Recommended ranges of cluster_selection_epsilon")
-            eps_ranges_df = pd.DataFrame(useful_eps_ranges)
-            st.write(eps_ranges_df.add_prefix("n_neighbors(UMAP)_").rename_axis("Min cluster size"))
-        with tab3:
-            st.header("Summary plot")
-            st.plotly_chart(hyperparameters_plot, use_container_width=True)
-        with tab4:
-            st.header("Recommendations")
-            st.dataframe(compliant_results_eps0[["(UMAP) n_neighbors", "min_cluster_size", "eps", "n_clusters", "percent_unclustered"]])
-            st.dataframe(compliant_results_all[["(UMAP) n_neighbors", "min_cluster_size", "eps", "n_clusters", "percent_unclustered"]])
-        with tab5:
-            st.header("Clusterings vs hyperparameters")
-            unclustered_vs_mcs_line = px.line(df, x="min_cluster_size", y="percent_unclustered", animation_frame="(UMAP) n_neighbors", height=500, color="eps", range_y=[0, 1.05*(df["percent_unclustered"].max())])
-            st.plotly_chart(unclustered_vs_mcs_line)
-            unclustered_vs_mcs = px.scatter(df, x="min_cluster_size", y="percent_unclustered", size="n_clusters", size_max=50, animation_frame="(UMAP) n_neighbors", height=900, color="eps", color_continuous_scale="Turbo", range_y=[-5, 1.05*(df["percent_unclustered"].max())])
-            st.plotly_chart(unclustered_vs_mcs, use_container_width=True)
-        with tab6:
-            st.subheader("Connectivity plots")
-            if plot_connectivity == "Yes":
-                st.write("Connectivity plot is temporarily disabled in this version.")
-            else:
-                st.write("You did not choose a connectivity plot.")
-        with tab7:
-            st.header("UMAP and HDBSCAN models in use & results")
-            st.write(st.session_state["models_umap"])  # UMAP models
-            st.write(st.session_state["models_hdbscan_configs"])  # HDBSCAN configs
-            st.write(results_incl_eps)  # full results incl ranges
-        with tab8:
-            st.header("Download all results as ZIP")
+    with tab2:
+        st.header("Recommended ranges of cluster_selection_epsilon")
+        eps_ranges_df = pd.DataFrame(useful_eps_ranges)
+        st.write(eps_ranges_df.add_prefix("n_neighbors(UMAP)_").rename_axis("Min cluster size"))
+    with tab3:
+        st.header("Summary plot")
+        st.plotly_chart(hyperparameters_plot, use_container_width=True)
+
+        st.subheader("🎨 Color mapping (reference clustering)")
+
+        # Get available runs from results structure
+        available_nns = sorted(results.keys())
+        selected_nn = st.selectbox("Select n_neighbors for reference clustering", available_nns, key="color_ref_nn")
+
+        available_mcs = sorted(results[selected_nn].keys())
+        selected_mcs = st.selectbox("Select min_cluster_size for reference clustering", available_mcs, key="color_ref_mcs")
+
+        if 0.0 in results[selected_nn][selected_mcs]:
+            ref_labels = results[selected_nn][selected_mcs][0.0]
+
+            color_map = build_color_map(ref_labels)
+
+            st.success(f"Generated color map with {len(color_map)} clusters (eps=0 reference)")
+
+            # store for later use
+            st.session_state["color_map"] = color_map
+            #st.session_state["color_ref_nn"] = selected_nn
+            #st.session_state["color_ref_mcs"] = selected_mcs
+        else:
+            st.warning("eps=0 not available for selected run — cannot generate color map.")
+
+
+    with tab4:
+        st.header("Recommendations")
+        st.dataframe(compliant_results_eps0[["(UMAP) n_neighbors", "min_cluster_size", "eps", "n_clusters", "percent_unclustered"]])
+        st.dataframe(compliant_results_all[["(UMAP) n_neighbors", "min_cluster_size", "eps", "n_clusters", "percent_unclustered"]])
+    with tab5:
+        st.header("Clusterings vs hyperparameters")
+        unclustered_vs_mcs_line = px.line(df, x="min_cluster_size", y="percent_unclustered", animation_frame="(UMAP) n_neighbors", height=500, color="eps", range_y=[0, 1.05*(df["percent_unclustered"].max())])
+        st.plotly_chart(unclustered_vs_mcs_line)
+        unclustered_vs_mcs = px.scatter(df, x="min_cluster_size", y="percent_unclustered", size="n_clusters", size_max=50, animation_frame="(UMAP) n_neighbors", height=900, color="eps", color_continuous_scale="Turbo", range_y=[-5, 1.05*(df["percent_unclustered"].max())])
+        st.plotly_chart(unclustered_vs_mcs, use_container_width=True)
+    with tab6:
+        st.subheader("Connectivity plots")
+        if plot_connectivity == "Yes":
+            st.write("Connectivity plot is temporarily disabled in this version.")
+        else:
+            st.write("You did not choose a connectivity plot.")
+    with tab7:
+        st.header("UMAP and HDBSCAN models in use & results")
+        st.write(st.session_state["models_umap"])  # UMAP models
+        st.write(st.session_state["models_hdbscan_configs"])  # HDBSCAN configs
+        st.write(results_incl_eps)  # full results incl ranges
+    with tab8:
+        st.header("Download all results as ZIP")
+        try:
+            export_df = build_export_table(results, data, int(number_dimensions), int(min_samples))
+        except NameError:
+            export_df = pd.DataFrame({"ID": data.index})
+            for nn in results:
+                for mcs in results[nn]:
+                    for eps_val, labels in results[nn][mcs].items():
+                        col_name = f"{number_dimensions}D_nn{nn}_mins{min_samples}_MSC{mcs}_eps{eps_val}"
+                        export_df[col_name] = labels
+        st.write("Preview of clustering results:")
+        st.dataframe(export_df.head())
+
+        def to_html_safe(fig):
             try:
-                export_df = build_export_table(results, data, int(number_dimensions), int(min_samples))
-            except NameError:
-                export_df = pd.DataFrame({"ID": data.index})
-                for nn in results:
-                    for mcs in results[nn]:
-                        for eps_val, labels in results[nn][mcs].items():
-                            col_name = f"{number_dimensions}D_nn{nn}_mins{min_samples}_MSC{mcs}_eps{eps_val}"
-                            export_df[col_name] = labels
-            st.write("Preview of clustering results:")
-            st.dataframe(export_df.head())
+                return fig.to_html()
+            except Exception:
+                return None
+        def to_csv_safe(df_in, index=False):
+            try:
+                return df_in.to_csv(index=index)
+            except Exception:
+                return None
+        def embedding_to_csv_bytes(embedding, index):
+            try:
+                df_embed = pd.DataFrame(embedding, columns=["UMAP_2D_X", "UMAP_2D_Y"])
+                idx_name = index.name if index.name is not None else "ID"
+                df_embed.insert(0, idx_name, index)
+                return df_embed.to_csv(index=False)
+            except Exception:
+                return None
 
-            def to_html_safe(fig):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as z:
+            csv = to_csv_safe(export_df, index=False)
+            if csv:
+                z.writestr("clustering_results.csv", csv)
+            # --- NEW: export color map ---
+            if "color_map" in st.session_state:
                 try:
-                    return fig.to_html()
-                except Exception:
-                    return None
-            def to_csv_safe(df_in, index=False):
-                try:
-                    return df_in.to_csv(index=index)
-                except Exception:
-                    return None
-            def embedding_to_csv_bytes(embedding, index):
-                try:
-                    df_embed = pd.DataFrame(embedding, columns=["UMAP_2D_X", "UMAP_2D_Y"])
-                    idx_name = index.name if index.name is not None else "ID"
-                    df_embed.insert(0, idx_name, index)
-                    return df_embed.to_csv(index=False)
-                except Exception:
-                    return None
+                    color_json = json.dumps(st.session_state["color_map"], indent=2)
+                    z.writestr("color_map.json", color_json)
+                except Exception as e:
+                    print("Failed to export color_map.json:", e)
+            try:
+                eps_raw = pd.DataFrame(useful_eps_ranges)
+                raw_csv = to_csv_safe(eps_raw, index=True)
+                if raw_csv:
+                    z.writestr("eps_recommendations_raw.csv", raw_csv)
+                eps_fmt = eps_raw.add_prefix("n_neighbors(UMAP)_")
+                eps_fmt.index.names = ["Min cluster size"]
+                fmt_csv = to_csv_safe(eps_fmt, index=True)
+                if fmt_csv:
+                    z.writestr("eps_recommendations_formatted.csv", fmt_csv)
+            except Exception:
+                pass
+            csv_eps0 = to_csv_safe(compliant_results_eps0, index=False)
+            if csv_eps0:
+                z.writestr("recommendations_eps0.csv", csv_eps0)
+            csv_all = to_csv_safe(compliant_results_all, index=False)
+            if csv_all:
+                z.writestr("recommendations_all.csv", csv_all)
+            html_summary = to_html_safe(hyperparameters_plot)
+            if html_summary:
+                z.writestr("summary_plot.html", html_summary)
+            fig_1 = px.scatter(data, x=vizred[nn_min][:,0], y=vizred[nn_min][:,1], hover_data={data.index.name or "ID": data.index}, title=f"n_neighbors {nn_min}")
+            fig_2 = px.scatter(data, x=vizred[nn_max][:,0], y=vizred[nn_max][:,1], hover_data={data.index.name or "ID": data.index}, title=f"n_neighbors {nn_max}")
+            html_min = to_html_safe(fig_1)
+            if html_min:
+                z.writestr("2D_plot_min_neighbors.html", html_min)
+            html_max = to_html_safe(fig_2)
+            if html_max:
+                z.writestr("2D_plot_max_neighbors.html", html_max)
+            html_line = to_html_safe(unclustered_vs_mcs_line)
+            if html_line:
+                z.writestr("unclustered_vs_mcs_line.html", html_line)
+            html_scatter = to_html_safe(unclustered_vs_mcs)
+            if html_scatter:
+                z.writestr("unclustered_vs_mcs_scatter.html", html_scatter)
+            try:
+                if st.session_state.get("models_include_umap2d_all", True):
+                    for nn_val, emb in st.session_state["umap2d_all_store"].items():
+                        csv_bytes = embedding_to_csv_bytes(emb, data.index)
+                        if csv_bytes:
+                            z.writestr(f"umap_2d_embedding_nn{nn_val}.csv", csv_bytes)
+            
+            except Exception:
+                pass
+            # --- NEW: export condensed trees & exemplars for eps=0 only ---
+            try:
+                for nn_val, per_mcs in results_incl_eps.items():
+                    for mcs_val, triple in per_mcs.items():
+                        # triple is [labels_by_eps, {"Useful eps range": ...}, extras_dict]
+                        if isinstance(triple, list) and len(triple) > 2 and isinstance(triple[2], dict):
+                            extras = triple[2]
+                            tree_df = extras.get("condensed_tree_df", None)
+                            ex_df = extras.get("exemplars_df", None)
 
-            buffer = io.BytesIO()
-            with zipfile.ZipFile(buffer, "w") as z:
-                csv = to_csv_safe(export_df, index=False)
-                if csv:
-                    z.writestr("clustering_results.csv", csv)
-                try:
-                    eps_raw = pd.DataFrame(useful_eps_ranges)
-                    raw_csv = to_csv_safe(eps_raw, index=True)
-                    if raw_csv:
-                        z.writestr("eps_recommendations_raw.csv", raw_csv)
-                    eps_fmt = eps_raw.add_prefix("n_neighbors(UMAP)_")
-                    eps_fmt.index.names = ["Min cluster size"]
-                    fmt_csv = to_csv_safe(eps_fmt, index=True)
-                    if fmt_csv:
-                        z.writestr("eps_recommendations_formatted.csv", fmt_csv)
-                except Exception:
-                    pass
-                csv_eps0 = to_csv_safe(compliant_results_eps0, index=False)
-                if csv_eps0:
-                    z.writestr("recommendations_eps0.csv", csv_eps0)
-                csv_all = to_csv_safe(compliant_results_all, index=False)
-                if csv_all:
-                    z.writestr("recommendations_all.csv", csv_all)
-                html_summary = to_html_safe(hyperparameters_plot)
-                if html_summary:
-                    z.writestr("summary_plot.html", html_summary)
-                fig_1 = px.scatter(data, x=vizred[nn_min][:,0], y=vizred[nn_min][:,1], hover_data={data.index.name or "ID": data.index}, title=f"n_neighbors {nn_min}")
-                fig_2 = px.scatter(data, x=vizred[nn_max][:,0], y=vizred[nn_max][:,1], hover_data={data.index.name or "ID": data.index}, title=f"n_neighbors {nn_max}")
-                html_min = to_html_safe(fig_1)
-                if html_min:
-                    z.writestr("2D_plot_min_neighbors.html", html_min)
-                html_max = to_html_safe(fig_2)
-                if html_max:
-                    z.writestr("2D_plot_max_neighbors.html", html_max)
-                html_line = to_html_safe(unclustered_vs_mcs_line)
-                if html_line:
-                    z.writestr("unclustered_vs_mcs_line.html", html_line)
-                html_scatter = to_html_safe(unclustered_vs_mcs)
-                if html_scatter:
-                    z.writestr("unclustered_vs_mcs_scatter.html", html_scatter)
-                try:
-                    if st.session_state.get("models_include_umap2d_all", True):
-                        for nn_val, emb in st.session_state["umap2d_all_store"].items():
-                            csv_bytes = embedding_to_csv_bytes(emb, data.index)
-                            if csv_bytes:
-                                z.writestr(f"umap_2d_embedding_nn{nn_val}.csv", csv_bytes)
-                except Exception:
-                    pass
+                            if tree_df is not None and not tree_df.empty:
+                                csv_tree = to_csv_safe(tree_df, index=False)
+                                if csv_tree:
+                                    z.writestr(f"eps0_condensed_tree_nn{nn_val}_mcs{mcs_val}.csv", csv_tree)
 
-            st.download_button(
-                label="Download ALL results as ZIP",
-                data=buffer.getvalue(),
-                file_name="all_results.zip",
-                mime="application/zip",
-            )
-    except Exception as e:
-        st.exception(e)
-        st.error("Calculation failed. Review parameters and try again.")
+                            if ex_df is not None and not ex_df.empty:
+                                csv_ex = to_csv_safe(ex_df, index=False)
+                                if csv_ex:
+                                    z.writestr(f"eps0_exemplars_nn{nn_val}_mcs{mcs_val}.csv", csv_ex)
+            except Exception:
+                # Don't fail the whole ZIP if these optional artifacts can't be generated
+                pass
+            
+
+        st.download_button(
+            label="Download ALL results as ZIP",
+            data=buffer.getvalue(),
+            file_name="all_results.zip",
+            mime="application/zip",
+        )
