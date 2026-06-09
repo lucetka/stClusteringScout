@@ -1,10 +1,4 @@
-
-# replacing stClusteringScout_Spekulatius.py version from Mon Dec 8th 2025 with _nutella
-# Cookie was a working and deployed version with exporting HDBSCAN results but without UMAP results exported.
-# Friday Dec 5th I added UMAP saving but messed up model writing and the sidebar behavior was messed up, it appeared only AFTER data upload.
-# Also help tooltips were gone. I named this Spekulatius. Monday Dec 8th I fixed Spekulatius but created more errors and finally I restarted from from Cookie
-# with co-pilot using some of the fixes I manually tested while fixing Spekulatius. So I renamed Spekulatius to Spekulatius v0 and the latest, "Best" version
-# which restarted from Cookie was renamed to Spekulatius. It's not confusing at all!!!!! (and I hope I recapped it right)
+# this is _NutellaPeanut version
 
 
 import io
@@ -83,25 +77,54 @@ def load_data(uploaded_file, has_index_col):
     return data_local
 
 def build_color_map(cluster_labels):
-    #import colorcet as cc
-
     unique = sorted(set(cluster_labels))
-    
-    # Remove noise temporarily
     non_noise = [c for c in unique if c != -1]
 
-    palette = list(cc.glasbey) + list(cc.glasbey_cool)
+    palette_raw = list(cc.glasbey) + list(cc.glasbey_cool)
+
+    def is_bad_color(hex_color, low=15, high=240):
+        hex_color = hex_color.lstrip('#')
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return (
+            (r > high and g > high and b > high) or  # avoid white/near-white
+            (r < low and g < low and b < low)        # avoid near-black
+        )
+
+    palette = [c for c in palette_raw if not is_bad_color(c)]
 
     color_map = {}
 
     for i, cluster_id in enumerate(non_noise):
         color_map[str(cluster_id)] = palette[i % len(palette)]
 
-    # Noise always white
+    # noise always white
     if -1 in unique:
         color_map["-1"] = "#FFFFFF"
 
     return color_map
+
+
+
+
+#def build_color_map(cluster_labels):
+#    import colorcet as cc
+
+ #   unique_clusters = sorted(set(cluster_labels))
+ #   palette = list(cc.glasbey) + list(cc.glasbey_cool)
+
+ #   color_map = {}
+ #   color_idx = 0
+
+  #  for c in unique_clusters:
+  #      if c == -1:
+  #          color_map[c] = "#FFFFFF"   # white for noise
+  #      else:
+  #          color_map[c] = palette[color_idx % len(palette)]
+  #          color_idx += 1
+
+   # return color_map
+
+
 
 
 def _exemplar_indices_from_tree(clusterer):
@@ -543,7 +566,7 @@ if st.session_state.get("calculation_done", False):
     nn_max = st.session_state["models_n_neighbors_max"]
     vizred = st.session_state["umap2d_all_store"]
 
-    # 👉 PASTE THE TABS BLOCK HERE
+    # 👉 TABS 
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "2D plots", "Cluster_selection_epsilon range recommendations", "Summary plot", "Recommendations",
             "Clusterings vs hyperparameters", "Diagnostic plots", "Models in use", "Download results"])
@@ -583,6 +606,39 @@ if st.session_state.get("calculation_done", False):
             #st.session_state["color_ref_mcs"] = selected_mcs
         else:
             st.warning("eps=0 not available for selected run — cannot generate color map.")
+        
+        # ---------------------------
+# REFERENCE CLUSTER SCATTER
+# ---------------------------
+
+        st.subheader("Reference clustering (2D view)")
+
+        umap_2d = st.session_state["umap2d_all_store"][selected_nn]
+
+
+        if ref_labels is not None and umap_2d is not None:
+
+            df_plot = pd.DataFrame({
+                "UMAP1": umap_2d[:, 0],
+                "UMAP2": umap_2d[:, 1],
+                "cluster": ref_labels
+            })
+
+            color_map = build_color_map(df_plot["cluster"])
+
+            fig = px.scatter(
+                df_plot,
+                x="UMAP1",
+                y="UMAP2",
+                color=df_plot["cluster"].astype(str),
+                color_discrete_map={str(k): v for k, v in color_map.items()},
+                title="Reference clustering (colored by cluster)",
+                height = 600,
+            )
+
+            fig.update_traces(marker=dict(size=5))
+            st.plotly_chart(fig, use_container_width=True)
+
 
 
     with tab4:
